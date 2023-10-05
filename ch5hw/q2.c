@@ -1,15 +1,17 @@
 #include <stdio.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <fcntl.h>
 #include <assert.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+
 
 // Question 2
 
 int main(){
-    
+
     int fd = open("file.txt", O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
 
     int pid = fork();
