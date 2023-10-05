@@ -4,8 +4,8 @@
 #include <sys/wait.h>
 
 int main() {
-    pid_t pid;
-    pid = fork();
+
+    int pid = fork();
     if (pid < 0) {
         fprintf(stderr, "Fork failed");
         exit(1);

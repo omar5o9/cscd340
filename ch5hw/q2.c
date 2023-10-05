@@ -9,6 +9,7 @@
 // Question 2
 
 int main(){
+    
     int fd = open("file.txt", O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
 
     int pid = fork();
