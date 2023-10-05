@@ -1,25 +1,39 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <stdlib.h>
 
 int main()
 {
     int rc = fork();
-    
-    if (rc == 0) // child
+
+    if (rc == 0) // child process
     {
-        printf("I am child process. My PID is %d\n", getpid());
-        exit(0);
+        close(STDOUT_FILENO);
+        printf("Hello World. Can you see this?\n");
     }
     else if (rc > 0)
     {
-        int status;
-        waitpid(rc, &status, 0);
-        printf("I am parent process. My PID  is %d\n", getpid());        
+        wait(NULL);
+        printf("I am parent process\n");
     }
-    else
+    else 
     {
-        fprintf(stderr, "Error occurred during fork()");
+        printf("Error occurred during fork()\n");
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
