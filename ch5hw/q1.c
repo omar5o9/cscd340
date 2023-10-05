@@ -7,13 +7,15 @@
 int main() {
     int x = 100;
     int pid = fork();
-    printf("Value of x = %d\n", x);
+    
 
     if (pid == 0) {
+        printf("Value of x = %d\n", x);
         x = 50;
         printf("Child process: x after fork = %d\n", x);
     
     } else if (pid > 0) {
+        printf("Value of x = %d\n", x);
         x = 200;
         printf("Parent process: x after fork = %d\n", x);
     } else {
