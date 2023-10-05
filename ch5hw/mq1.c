@@ -1,36 +1,40 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <string.h>
 
+#define true 1
+#define false 1
 int main()
 {
-    int my_file = open("hello.txt", O_CREAT | O_WRONLY, S_IRWXU);
-    
+    int backend_file = open("backend_file.txt", O_CREAT | O_RDWR | O_TRUNC, S_IRWXU);
     int rc = fork();
 
-    if (rc == 0)
+    if (rc == 0) // child process
     {
-        const char * child_msg = "Hello, I am child process. Writing on you\n";
-
-        printf("-------------------------------\n");
-        printf("Child process\n");
-        printf("-------------------------------\n");
-        printf("Accessing File Descriptor (file handle): %d\n", my_file);
-        write(my_file, child_msg , strlen(child_msg));
+        write(backend_file, "true", 4);
+        printf("I am child process\n");
+        printf("hello\n");
+        close(backend_file);
     }
     else if (rc > 0)
     {
-        const char * parent_msg = "Hello, I am parent process. Writing on you\n";
-        printf("-------------------------------\n");
-        printf("Parent process\n");
-        printf("-------------------------------\n");
-        printf("Accessing File Descriptor (file handle): %d\n", my_file);
-        write(my_file, parent_msg, strlen(parent_msg));
+        char buffer[4];
+        buffer[4] = '\0';
+        while (strcmp(buffer, "true\0") != 0)
+        {
+            // I am closing and opening file again so that our program can see updated content.
+            close(backend_file);
+            backend_file = open("backend_file.txt", O_CREAT | O_RDWR, S_IRWXU);
+            read(backend_file, buffer, 4);
+            usleep(10 * 1000); // sleep for 10 milli-seconds
+        }
+
+        printf("I am parent process\n");
+        printf("goodbye\n");
     }
-    close(my_file);
+    close(backend_file);
     return 0;
 }
