@@ -52,7 +52,7 @@ int main() {
     elapsed_time = (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) / 1000000.0;
 
     printf("Counter value: %d\n", counter);
-    printf("Elapsed time: %f seconds\n", elapsed_time);
+    printf("Elapsed time: %d milliseconds\n", (int)(elapsed_time * 1000));
 
     return 0;
 }
