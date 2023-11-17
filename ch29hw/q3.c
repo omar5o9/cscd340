@@ -1,82 +1,58 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
+#include <omp.h>
 #include <sys/time.h>
 
-typedef struct {
-    int counter;
-    pthread_mutex_t lock;
-} approx_counter_t;
+#define MAX_THREADS 8
 
-void approx_counter_init(approx_counter_t *c) {
-    c->counter = 0;
-    pthread_mutex_init(&c->lock, NULL);
+int counter = 0;
+
+void increment_counter() {
+    counter++;
 }
 
-void approx_counter_increment(approx_counter_t *c) {
-    pthread_mutex_lock(&c->lock);
-    c->counter++;
-    pthread_mutex_unlock(&c->lock);
+void parallel_increment(int num_threads, int threshold) {
+    #pragma omp parallel num_threads(num_threads)
+    {
+        int i;
+        for (i = 0; i < threshold; i++) {
+            increment_counter();
+        }
+    }
 }
 
-int approx_counter_get(approx_counter_t *c) {
-    int val;
-    pthread_mutex_lock(&c->lock);
-    val = c->counter;
-    pthread_mutex_unlock(&c->lock);
-    return val;
-}
-
-void approx_counter_destroy(approx_counter_t *c) {
-    pthread_mutex_destroy(&c->lock);
-}
-
-void *thread_func(void *arg) {
-    approx_counter_t *c = (approx_counter_t *) arg;
+void approximate_increment(int threshold) {
     int i;
-    while (approx_counter_get(c) < c->counter) {
-        approx_counter_increment(c);
+    for (i = 0; i < threshold; i++) {
+        increment_counter();
     }
-    return NULL;
 }
 
-int main(int argc, char *argv[]) {
-    int num_threads, i, threshold;
-    pthread_t *threads;
-    approx_counter_t counter;
-    struct timeval start_time, end_time;
+int main() {
+    int num_threads, threshold, i;
+    double start_time, end_time, elapsed_time;
+    struct timeval t1, t2;
 
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s <num_threads> <threshold> <counter>\n", argv[0]);
-        exit(EXIT_FAILURE);
+    printf("Enter the number of threads (1-%d): ", MAX_THREADS);
+    scanf("%d", &num_threads);
+
+    printf("Enter the threshold value: ");
+    scanf("%d", &threshold);
+
+    gettimeofday(&t1, NULL);
+
+    if (num_threads == 1) {
+        approximate_increment(threshold);
+    } else {
+        parallel_increment(num_threads, threshold);
     }
 
-    num_threads = atoi(argv[1]);
-    threshold = atoi(argv[2]);
-    counter.counter = atoi(argv[3]);
-    threads = (pthread_t *) malloc(num_threads * sizeof(pthread_t));
+    gettimeofday(&t2, NULL);
+    elapsed_time = (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) / 1000000.0;
 
-    approx_counter_init(&counter);
-
-    gettimeofday(&start_time, NULL);
-
-    for (i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, thread_func, &counter);
-    }
-
-    for (i = 0; i < num_threads; i++) {
-        pthread_join(threads[i], NULL);
-    }
-
-    gettimeofday(&end_time, NULL);
-
-    printf("Counter value: %d\n", approx_counter_get(&counter));
-    printf("Elapsed time: %ld microseconds\n", ((end_time.tv_sec * 1000000 + end_time.tv_usec) - (start_time.tv_sec * 1000000 + start_time.tv_usec)));
-
-    approx_counter_destroy(&counter);
-
-    free(threads);
+    printf("Counter value: %d\n", counter);
+    printf("Elapsed time: %f seconds\n", elapsed_time);
 
     return 0;
 }
