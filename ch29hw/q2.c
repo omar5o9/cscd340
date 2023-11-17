@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 #define NUM_INCREMENTS 1000000
 
@@ -27,6 +28,9 @@ int main() {
     pthread_t threads[num_threads];
     int thread_counters[num_threads];
 
+    struct timeval start_time, end_time;
+    gettimeofday(&start_time, NULL);
+
     for (int i = 0; i < num_threads; i++) {
         thread_counters[i] = 0;
         pthread_create(&threads[i], NULL, thread_function, &thread_counters[i]);
@@ -40,7 +44,11 @@ int main() {
         counter += thread_counters[i];
     }
 
+    gettimeofday(&end_time, NULL);
+    double elapsed_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+
     printf("Counter value: %d\n", counter);
+    printf("Elapsed time: %f seconds\n", elapsed_time);
 
     return 0;
 }

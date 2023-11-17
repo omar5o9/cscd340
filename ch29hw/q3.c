@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <sys/time.h>
 
 #define MAX_THREADS 100
 
@@ -44,6 +45,9 @@ int main(int argc, char *argv[]) {
     pthread_t threads[num_threads];
     int iterations_per_thread = num_iterations / num_threads;
 
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+
     for (int i = 0; i < num_threads; i++) {
         pthread_create(&threads[i], NULL, worker, &iterations_per_thread);
     }
@@ -52,7 +56,12 @@ int main(int argc, char *argv[]) {
         pthread_join(threads[i], NULL);
     }
 
+    gettimeofday(&end, NULL);
+    double time_taken = (end.tv_sec - start.tv_sec) * 1e6;
+    time_taken = (time_taken + (end.tv_usec - start.tv_usec)) * 1e-6;
+
     printf("Counter value: %d\n", get_counter());
+    printf("Time taken: %f seconds\n", time_taken);
 
     return 0;
 }
