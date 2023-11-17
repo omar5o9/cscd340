@@ -2,50 +2,81 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <stdatomic.h>
-#include <time.h>
 #include <sys/time.h>
 
-#define MAX_THREADS 1000000
+typedef struct {
+    int counter;
+    pthread_mutex_t lock;
+} approx_counter_t;
 
-atomic_int counter;
+void approx_counter_init(approx_counter_t *c) {
+    c->counter = 0;
+    pthread_mutex_init(&c->lock, NULL);
+}
 
-void increment_counter(double threshold, double *elapsed_time) {
-    int local_counter = 0;
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-    for (int i = 0; i < 1000000; i++) {
-        double r = (double) rand() / RAND_MAX;
-        if (r < threshold) {
-            local_counter++;
-        }
+void approx_counter_increment(approx_counter_t *c) {
+    pthread_mutex_lock(&c->lock);
+    c->counter++;
+    pthread_mutex_unlock(&c->lock);
+}
+
+int approx_counter_get(approx_counter_t *c) {
+    int val;
+    pthread_mutex_lock(&c->lock);
+    val = c->counter;
+    pthread_mutex_unlock(&c->lock);
+    return val;
+}
+
+void approx_counter_destroy(approx_counter_t *c) {
+    pthread_mutex_destroy(&c->lock);
+}
+
+void *thread_func(void *arg) {
+    approx_counter_t *c = (approx_counter_t *) arg;
+    int i;
+    while (approx_counter_get(c) < c->counter) {
+        approx_counter_increment(c);
     }
-    gettimeofday(&end_time, NULL);
-    *elapsed_time += (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
-    atomic_fetch_add(&counter, local_counter);
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s num_threads threshold\n", argv[0]);
+    int num_threads, i, threshold;
+    pthread_t *threads;
+    approx_counter_t counter;
+    struct timeval start_time, end_time;
+
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <num_threads> <threshold> <counter>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-    int num_threads = atoi(argv[1]);
-    double threshold = atof(argv[2]);
-    if (num_threads < 1 || num_threads > MAX_THREADS) {
-        fprintf(stderr, "Invalid number of threads: %d\n", num_threads);
-        exit(EXIT_FAILURE);
+
+    num_threads = atoi(argv[1]);
+    threshold = atoi(argv[2]);
+    counter.counter = atoi(argv[3]);
+    threads = (pthread_t *) malloc(num_threads * sizeof(pthread_t));
+
+    approx_counter_init(&counter);
+
+    gettimeofday(&start_time, NULL);
+
+    for (i = 0; i < num_threads; i++) {
+        pthread_create(&threads[i], NULL, thread_func, &counter);
     }
-    pthread_t threads[num_threads];
-    double elapsed_time = 0;
-    for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, (void *(*)(void *)) increment_counter, (void *) threshold, &elapsed_time);
-    }
-    for (int i = 0; i < num_threads; i++) {
+
+    for (i = 0; i < num_threads; i++) {
         pthread_join(threads[i], NULL);
     }
-    printf("Counter value: %d\n", counter);
-    //printf("Elapsed time: %f microseconds\n", elapsed_time);
-    printf("Time to calculate: %f microseconds\n", elapsed_time - num_threads * 1000000);
+
+    gettimeofday(&end_time, NULL);
+
+    printf("Counter value: %d\n", approx_counter_get(&counter));
+    printf("Elapsed time: %ld microseconds\n", ((end_time.tv_sec * 1000000 + end_time.tv_usec) - (start_time.tv_sec * 1000000 + start_time.tv_usec)));
+
+    approx_counter_destroy(&counter);
+
+    free(threads);
+
     return 0;
 }
