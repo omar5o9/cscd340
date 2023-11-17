@@ -4,56 +4,76 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-#define ARRAY_SIZE 1000000
+#define MAX_THREADS 64
 
+int thread_count;
+long long n;
+double threshold;
 int counter = 0;
-int *array;
+pthread_mutex_t mutex;
 
-void *count_threshold(void *arg) {
-    int thread_num = *(int *)arg;
-    int start = thread_num * (ARRAY_SIZE / 4);
-    int end = start + (ARRAY_SIZE / 4);
-    int count = 0;
+void* Thread_sum(void* rank);
 
-    for (int i = start; i < end; i++) {
-        if (array[i] >= thread_num) {
-            count++;
+int main(int argc, char* argv[]) {
+    long thread;
+    pthread_t* thread_handles;
+    struct timeval start, end;
+    double elapsed_time;
+
+    thread_count = strtol(argv[1], NULL, 10);
+    n = strtoll(argv[2], NULL, 10);
+    threshold = strtod(argv[3], NULL);
+
+    thread_handles = malloc(thread_count * sizeof(pthread_t));
+    pthread_mutex_init(&mutex, NULL);
+
+    gettimeofday(&start, NULL);
+    for (thread = 0; thread < thread_count; thread++) {
+        pthread_create(&thread_handles[thread], NULL, Thread_sum, (void*) thread);
+    }
+
+    for (thread = 0; thread < thread_count; thread++) {
+        pthread_join(thread_handles[thread], NULL);
+    }
+    gettimeofday(&end, NULL);
+
+    elapsed_time = (end.tv_sec - start.tv_sec) * 1000.0;
+    elapsed_time += (end.tv_usec - start.tv_usec) / 1000.0;
+
+    printf("With n = %lld terms,\n", n);
+    printf("    Our estimate of pi = %f\n", 4.0 * counter / ((double) n));
+    printf("    Time elapsed = %f milliseconds\n", elapsed_time);
+    printf("    Counter = %d\n", counter);
+
+    pthread_mutex_destroy(&mutex);
+    free(thread_handles);
+    return 0;
+}
+
+void* Thread_sum(void* rank) {
+    long my_rank = (long) rank;
+    long long i;
+    long long my_n = n / thread_count;
+    long long my_first_i = my_n * my_rank;
+    long long my_last_i = my_first_i + my_n;
+
+    int my_count = 0;
+    double factor;
+    if (my_first_i % 2 == 0) {
+        factor = 1.0;
+    } else {
+        factor = -1.0;
+    }
+
+    for (i = my_first_i; i < my_last_i; i++, factor = -factor) {
+        if (factor * 1.0 / (2 * i + 1) > threshold) {
+            my_count++;
         }
     }
 
-    counter += count;
+    pthread_mutex_lock(&mutex);
+    counter += my_count;
+    pthread_mutex_unlock(&mutex);
 
-    pthread_exit(NULL);
-}
-
-int main() {
-    srand(time(NULL));
-    array = malloc(sizeof(int) * ARRAY_SIZE);
-
-    for (int i = 0; i < ARRAY_SIZE; i++) {
-        array[i] = rand() % 100;
-    }
-
-    pthread_t threads[4];
-    int thread_nums[4] = {0, 1, 2, 3};
-
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-
-    for (int i = 0; i < 4; i++) {
-        pthread_create(&threads[i], NULL, count_threshold, &thread_nums[i]);
-    }
-
-    for (int i = 0; i < 4; i++) {
-        pthread_join(threads[i], NULL);
-    }
-
-    gettimeofday(&end_time, NULL);
-
-    printf("Counter: %d\n", counter);
-    printf("Time taken: %ld microseconds\n", ((end_time.tv_sec * 1000000 + end_time.tv_usec) - (start_time.tv_sec * 1000000 + start_time.tv_usec)));
-
-    free(array);
-
-    return 0;
+    return NULL;
 }
