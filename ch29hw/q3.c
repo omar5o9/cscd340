@@ -3,65 +3,49 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <time.h>
 #include <sys/time.h>
 
-#define MAX_THREADS 100
+#define MAX_THREADS 1000000
 
 atomic_int counter;
 
-void increment_counter(double threshold) {
-    double r = (double) rand() / RAND_MAX;
-    if (r < threshold) {
-        atomic_fetch_add(&counter, 1);
+void increment_counter(double threshold, double *elapsed_time) {
+    int local_counter = 0;
+    struct timeval start_time, end_time;
+    gettimeofday(&start_time, NULL);
+    for (int i = 0; i < 1000000; i++) {
+        double r = (double) rand() / RAND_MAX;
+        if (r < threshold) {
+            local_counter++;
+        }
     }
-}
-
-int get_counter() {
-    return atomic_load(&counter);
-}
-
-void *worker(void *arg) {
-    int num_iterations = *(int *) arg;
-    for (int i = 0; i < num_iterations; i++) {
-        increment_counter(0.5);
-    }
-    return NULL;
+    gettimeofday(&end_time, NULL);
+    *elapsed_time += (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
+    atomic_fetch_add(&counter, local_counter);
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s num_threads num_iterations\n", argv[0]);
+        fprintf(stderr, "Usage: %s num_threads threshold\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-
     int num_threads = atoi(argv[1]);
-    int num_iterations = atoi(argv[2]);
-
+    double threshold = atof(argv[2]);
     if (num_threads < 1 || num_threads > MAX_THREADS) {
-        fprintf(stderr, "num_threads must be between 1 and %d\n", MAX_THREADS);
+        fprintf(stderr, "Invalid number of threads: %d\n", num_threads);
         exit(EXIT_FAILURE);
     }
-
     pthread_t threads[num_threads];
-    int iterations_per_thread = num_iterations / num_threads;
-
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-
+    double elapsed_time = 0;
     for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, worker, &iterations_per_thread);
+        pthread_create(&threads[i], NULL, (void *(*)(void *)) increment_counter, (void *) threshold, &elapsed_time);
     }
-
     for (int i = 0; i < num_threads; i++) {
         pthread_join(threads[i], NULL);
     }
-
-    gettimeofday(&end, NULL);
-    double time_taken = (end.tv_sec - start.tv_sec) * 1e6;
-    time_taken = (time_taken + (end.tv_usec - start.tv_usec)) * 1e-6;
-
-    printf("Counter value: %d\n", get_counter());
-    printf("Time taken: %f seconds\n", time_taken);
-
+    printf("Counter value: %d\n", counter);
+    //printf("Elapsed time: %f microseconds\n", elapsed_time);
+    printf("Time to calculate: %f microseconds\n", elapsed_time - num_threads * 1000000);
     return 0;
 }
