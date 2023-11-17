@@ -4,77 +4,56 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-typedef struct {
-    int counter;
-    pthread_mutex_t lock;
-} approx_counter_t;
+#define ARRAY_SIZE 1000000
 
-void approx_counter_init(approx_counter_t *c) {
-    c->counter = 0;
-    pthread_mutex_init(&c->lock, NULL);
-}
+int counter = 0;
+int *array;
 
-void approx_counter_increment(approx_counter_t *c) {
-    pthread_mutex_lock(&c->lock);
-    c->counter++;
-    pthread_mutex_unlock(&c->lock);
-}
+void *count_threshold(void *arg) {
+    int thread_num = *(int *)arg;
+    int start = thread_num * (ARRAY_SIZE / 4);
+    int end = start + (ARRAY_SIZE / 4);
+    int count = 0;
 
-int approx_counter_get(approx_counter_t *c) {
-    pthread_mutex_lock(&c->lock);
-    int value = c->counter;
-    pthread_mutex_unlock(&c->lock);
-    return value;
-}
-
-void approx_counter_destroy(approx_counter_t *c) {
-    pthread_mutex_destroy(&c->lock);
-}
-
-void *thread_func(void *arg) {
-    approx_counter_t *c = (approx_counter_t *) arg;
-    int threshold = *((int *) arg + 1);
-    for (int i = 0; i < threshold; i++) {
-        approx_counter_increment(c);
-    }
-    return NULL;
-}
-
-int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <num_threads> <threshold>\n", argv[0]);
-        exit(EXIT_FAILURE);
+    for (int i = start; i < end; i++) {
+        if (array[i] >= thread_num) {
+            count++;
+        }
     }
 
-    int num_threads = atoi(argv[1]);
-    int threshold = atoi(argv[2]);
+    counter += count;
 
-    approx_counter_t counter;
-    approx_counter_init(&counter);
+    pthread_exit(NULL);
+}
 
-    pthread_t threads[num_threads];
+int main() {
+    srand(time(NULL));
+    array = malloc(sizeof(int) * ARRAY_SIZE);
 
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-
-    for (int i = 0; i < num_threads; i++) {
-        void *args[] = {&counter, &threshold};
-        pthread_create(&threads[i], NULL, thread_func, args);
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        array[i] = rand() % 100;
     }
 
-    for (int i = 0; i < num_threads; i++) {
+    pthread_t threads[4];
+    int thread_nums[4] = {0, 1, 2, 3};
+
+    struct timeval start_time, end_time;
+    gettimeofday(&start_time, NULL);
+
+    for (int i = 0; i < 4; i++) {
+        pthread_create(&threads[i], NULL, count_threshold, &thread_nums[i]);
+    }
+
+    for (int i = 0; i < 4; i++) {
         pthread_join(threads[i], NULL);
     }
 
-    gettimeofday(&end, NULL);
-    double time_taken = (end.tv_sec - start.tv_sec) * 1e6;
-    time_taken = (time_taken + (end.tv_usec - start.tv_usec)) * 1e-6;
+    gettimeofday(&end_time, NULL);
 
-    int final_value = approx_counter_get(&counter);
-    printf("Final value: %d\n", final_value);
-    printf("Time taken: %f seconds\n", time_taken);
+    printf("Counter: %d\n", counter);
+    printf("Time taken: %ld microseconds\n", ((end_time.tv_sec * 1000000 + end_time.tv_usec) - (start_time.tv_sec * 1000000 + start_time.tv_usec)));
 
-    approx_counter_destroy(&counter);
+    free(array);
 
     return 0;
 }
