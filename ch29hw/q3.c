@@ -4,8 +4,6 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-#define THRESHOLD 1000000
-
 typedef struct {
     int counter;
     pthread_mutex_t lock;
@@ -35,19 +33,21 @@ void approx_counter_destroy(approx_counter_t *c) {
 
 void *thread_func(void *arg) {
     approx_counter_t *c = (approx_counter_t *) arg;
-    for (int i = 0; i < THRESHOLD; i++) {
+    int threshold = *((int *) arg + 1);
+    for (int i = 0; i < threshold; i++) {
         approx_counter_increment(c);
     }
     return NULL;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <num_threads>\n", argv[0]);
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <num_threads> <threshold>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     int num_threads = atoi(argv[1]);
+    int threshold = atoi(argv[2]);
 
     approx_counter_t counter;
     approx_counter_init(&counter);
@@ -58,7 +58,8 @@ int main(int argc, char *argv[]) {
     gettimeofday(&start, NULL);
 
     for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, thread_func, &counter);
+        void *args[] = {&counter, &threshold};
+        pthread_create(&threads[i], NULL, thread_func, args);
     }
 
     for (int i = 0; i < num_threads; i++) {
