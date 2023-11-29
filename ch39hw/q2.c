@@ -3,96 +3,56 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
-#include <string.h> // Include the <string.h> header
-#include <limits.h> // Include the <limits.h> header
+#include <unistd.h> 
 
-void listFiles(const char *dirPath, int showDetails) {
-    DIR *dir;
-    struct dirent *entry;
-    struct stat fileStat;
 
-    // Open the directory
-    dir = opendir(dirPath);
+void listFiles(const char* directory, int detailed) {
+    DIR* dir = opendir(directory);
     if (dir == NULL) {
-        perror("opendir");
-        exit(EXIT_FAILURE);
+        printf("Error opening directory: %s\n", directory);
+        return;
     }
 
-    // Read directory entries
+    struct dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
-        // Skip "." and ".." entries
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        // Get the file path
-                char filePath[PATH_MAX];
-                snprintf(filePath, sizeof(filePath), "%s/%s", dirPath, entry->d_name);
-
-                // Get file information
-                if (showDetails) {
-                    if (stat(filePath, &fileStat) == -1) {
-                        perror("stat");
-                        exit(EXIT_FAILURE);
-                    }
-
-                    // Print file details
-                    printf("File: %s\n", entry->d_name);
-                    printf("Owner: %d\n", fileStat.st_uid);
-                    printf("Group: %d\n", fileStat.st_gid);
-                    printf("Permissions: %o\n", fileStat.st_mode & 0777);
-                    printf("Size: %ld bytes\n", fileStat.st_size);
-                    printf("Last modified: %s", ctime(&fileStat.st_mtime));
-                }
+        if (detailed) {
+            struct stat fileStat;
+            char filePath[256];
+            snprintf(filePath, sizeof(filePath), "%s/%s", directory, entry->d_name);
+            if (stat(filePath, &fileStat) == -1) {
+                printf("Error getting file information: %s\n", entry->d_name);
+                continue;
             }
-            closedir(dir);
+            printf("File: %s\n", entry->d_name);
+            printf("Owner: %d\n", fileStat.st_uid);
+            printf("Group: %d\n", fileStat.st_gid);
+            printf("Permissions: %o\n", fileStat.st_mode & 0777);
+            // Print other file information as needed
+        } else {
+            printf("%s\n", entry->d_name);
         }
+    }
 
-        int main(int argc, char *argv[]) {
-            const char *dirPath;
-            int showDetails = 0;
+    closedir(dir);
+}
 
-            if (argc == 3 && strcmp(argv[1], "-l") == 0) {
-                showDetails = 1;
-                dirPath = argv[2];
-            } else if (argc == 2) {
-                // Directory path provided
-                dirPath = argv[1];
-            } else {
-                fprintf(stderr, "Usage: %s [-l] [directory]\n", argv[0]);
-                exit(EXIT_FAILURE);
-            }
+int main(int argc, char* argv[]) {
+    int detailed = 0;
+    const char* directory;
 
-            // List files in the directory
-            listFiles(dirPath, showDetails);
-
-            return 0;
-        }
-    // Check if directory path is provided
-    if (argc == 1) {
-        // No directory path provided, use current working directory
-        if (getcwd(cwd, sizeof(cwd)) == NULL) {
-            perror("getcwd");
-            exit(EXIT_FAILURE);
-        }
-        dirPath = cwd;
+    if (argc == 2 && strcmp(argv[1], "-l") == 0) {
+        detailed = 1;
+        directory = getcwd(NULL, 0);
+    } else if (argc == 3 && strcmp(argv[1], "-l") == 0) {
+        detailed = 1;
+        directory = argv[2];
     } else if (argc == 2) {
-        // Directory path provided
-        dirPath = argv[1];
+        directory = argv[1];
     } else {
-        fprintf(stderr, "Usage: %s [-l] [directory]\n", argv[0]);
-        exit(EXIT_FAILURE);
+        directory = getcwd(NULL, 0);
     }
 
-    // Check if -l flag is provided
-    int showDetails = 0;
-    if (argc == 3 && strcmp(argv[1], "-l") == 0) {
-        showDetails = 1;
-    }
-
-    // List files in the directory
-    listFiles(dirPath, showDetails);
+    listFiles(directory, detailed);
 
     return 0;
 }
